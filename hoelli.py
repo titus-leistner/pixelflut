@@ -1,7 +1,16 @@
+import gevent
+from gevent import monkey
+monkey.patch_socket()
+
 import random
 import socket
 import time
 import urllib.request
+
+
+N_GREENLETS = 16
+DT_OFFSET = 20.0
+DT_IMG = 60.0
 
 
 def get_offset(px_cnt=0):
@@ -29,16 +38,9 @@ def get_img():
     return img, w, h
 
 
-def main():
-    DT_OFFSET = 20.0
-    DT_IMG = 60.0
-    N_SOCKS = 16
-
-    # connect
-    sockets = [socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-               for _ in range(N_SOCKS)]
-    for sock in sockets:
-        sock.connect(('151.217.111.34', 1234))
+def bombard():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(('151.217.111.34', 1234))
 
     dx, dy = get_offset()
     print(dx, dy)
@@ -68,11 +70,11 @@ def main():
     while True:
 
         cmd = image_list[i]
-        sockets[i_sock].send(cmd)
+        sock.send(cmd)
         i = i + 1 % len(image_list)
 
         px_cnt += 1
-        i_sock = (i_sock + 1) % N_SOCKS
+        i_sock = (i_sock + 1) % N_GREENLETS
 
 #        if i % 1024 == 0:
 #            if time.time() - time0 > DT_OFFSET:
@@ -87,9 +89,15 @@ def main():
 #        i += 1
 
 
+def main():
+    greenlets = [gevent.spawn(bombard) for _ in range(N_GREENLETS)]
+    gevent.joinall(greenlets)
+
+
 if __name__ == '__main__':
     while True:
         try:
             main()
-        except Exception:
-            print()
+        except Exception as e:
+            print(e)
+
