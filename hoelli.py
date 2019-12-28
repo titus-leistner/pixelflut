@@ -49,8 +49,12 @@ def bombard():
     print(w, h)
 
     image_list = []
-    for x in random.shuffle(range(w)):
-        for y in random.shuffle(range(h)):
+    ws = list(range(w))
+    hs = list(range(h))
+    random.shuffle(ws)
+    random.shuffle(hs)
+    for x in ws:
+        for y in hs:
             rgb = img[y][x]
 
             if rgb == '000000':
