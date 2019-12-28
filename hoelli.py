@@ -38,7 +38,7 @@ def load_img(url):
     return img
 
 
-def get_cmds(dx, dy, img):
+def get_cmd_str(dx, dy, img):
     print('Updating command list...', end='', flush=True)
     h = len(img)
     w = len(img[0])
@@ -56,9 +56,11 @@ def get_cmds(dx, dy, img):
                 xx=x+dx, yy=y+dy, rgb=rgb).encode())
 
     random.shuffle(cmds)
+    n_px = len(cmds)
+    cmd_str = b''.join(cmds)
     print(' Done.')
 
-    return cmds
+    return cmd_str, n_px
 
 
 def main():
@@ -81,33 +83,33 @@ def main():
     dx, dy, url = call_api()
     img = load_img(url)
 
-    cmds = get_cmds(dx, dy, img)
+    cmd_str, n_px = get_cmd_str(dx, dy, img)
 
     print('Let\'s Hölli...')
 
     time0 = time.time()
     i_sock = 0
     px_cnt = 0
+
     while True:
-        for cmd in cmds:
-            sockets[i_sock].send(cmd)
-            px_cnt += 1
-            i_sock = (i_sock + 1) % len(sockets)
+        sockets[i_sock].send(cmd_str)
+        px_cnt += n_px
+        i_sock = (i_sock + 1) % len(sockets)
 
-            if time.time() - time0 > DT:
-                ndx, ndy, nurl = call_api(px_cnt)
+        if time.time() - time0 > DT:
+            ndx, ndy, nurl = call_api(px_cnt)
 
-                if nurl != url:
-                    url = nurl
-                    img = load_img(url)
-                    cmds = get_cmds(dx, dy, img)
+            if nurl != url:
+                url = nurl
+                img = load_img(url)
+                cmd_str, n_px = get_cmd_str(dx, dy, img)
 
-                if ndx != dx or ndy != dy:
-                    dx, dy = ndx, ndy
-                    cmds = get_cmds(dx, dy, img)
+            if ndx != dx or ndy != dy:
+                dx, dy = ndx, ndy
+                cmd_str, n_px = get_cmd_str(dx, dy, img)
 
-                time0 = time.time()
-                px_cnt = 0
+            time0 = time.time()
+            px_cnt = 0
 
 
 if __name__ == '__main__':
