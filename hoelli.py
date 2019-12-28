@@ -1,14 +1,14 @@
 import gevent
 from gevent import monkey
-monkey.patch_socket()
+monkey.patch_all()
+from gevent import socket
 
 import random
-import socket
 import time
 import urllib.request
 
 
-N_GREENLETS = 16
+N_GREENLETS = 10
 DT_OFFSET = 20.0
 DT_IMG = 60.0
 
@@ -67,18 +67,15 @@ def bombard():
     print('Start...')
     time0 = 0
     time1 = 0
-    i_sock = 0
-    px_cnt = 0
     i = 0
     image_list_index = 0
     while True:
 
         cmd = image_list[i]
         sock.send(cmd)
-        i = i + 1 % len(image_list)
+        i = (i + 1) % len(image_list)
+        gevent.sleep(0.00001)
 
-        px_cnt += 1
-        i_sock = (i_sock + 1) % N_GREENLETS
 
 #        if i % 1024 == 0:
 #            if time.time() - time0 > DT_OFFSET:
