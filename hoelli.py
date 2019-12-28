@@ -46,36 +46,45 @@ def main():
     img, w, h = get_img()
     print(w, h)
 
+    image_list = []
+    for x in random.shuffle(range(w)):
+        for y in random.shuffle(range(h)):
+            rgb = img[y][x]
+
+            if rgb == '000000':
+                continue
+
+            cmd = 'PX {xx} {yy} {rgb}\n'.format(xx=x + dx, yy=y + dy, rgb=rgb).encode()
+            image_list.append(cmd)
+
+
     print('Start...')
     time0 = 0
     time1 = 0
     i_sock = 0
     px_cnt = 0
     i = 0
+    image_list_index = 0
     while True:
-        x = random.randint(0, w - 1)
-        y = random.randint(0, h - 1)
 
-        rgb = img[y][x]
-        if rgb == '000000':
-            continue
-
-        cmd = 'PX {xx} {yy} {rgb}\n'.format(xx=x+dx, yy=y+dy, rgb=rgb).encode()
+        cmd = image_list[i]
         sockets[i_sock].send(cmd)
+        i = i + 1 % len(image_list)
+
         px_cnt += 1
         i_sock = (i_sock + 1) % N_SOCKS
 
-        if i % 1024 == 0:
-            if time.time() - time0 > DT_OFFSET:
-                dx, dy = get_offset(px_cnt)
-                time0 = time.time()
-                px_cnt = 0
+#        if i % 1024 == 0:
+#            if time.time() - time0 > DT_OFFSET:
+#                dx, dy = get_offset(px_cnt)
+#               time0 = time.time()
+#                px_cnt = 0
 
-            if time.time() - time1 > DT_IMG:
-                print('Update Image')
-                img, w, h = get_img()
-                time1 = time.time()
-        i += 1
+#            if time.time() - time1 > DT_IMG:
+#                print('Update Image')
+#                img, w, h = get_img()
+#                time1 = time.time()
+#        i += 1
 
 
 if __name__ == '__main__':
@@ -83,4 +92,4 @@ if __name__ == '__main__':
         try:
             main()
         except Exception:
-            pass
+            print()
