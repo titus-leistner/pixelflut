@@ -248,11 +248,10 @@ def main():
 
 if __name__ == '__main__':
     while True:
-        main()
-        # try:
-        #    main()
-        # except Exception as e:
-        #    # catch all exceptions and restart ;)
-        #    print('An exception encountered: ',
-        #          type(e),  e, ' Restarting...')
-        # time.sleep(10.0)
+        try:
+           main()
+        except Exception as e:
+           # catch all exceptions and restart ;)
+           print('An exception encountered: ',
+                 type(e),  e, ' Restarting...')
+        time.sleep(10.0)
