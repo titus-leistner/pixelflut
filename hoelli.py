@@ -4,6 +4,7 @@ import time
 import urllib.request
 import sys
 import hashlib
+import selectors
 
 DT = 10.0
 TRANSPARENT = '000000'
@@ -78,7 +79,7 @@ def load_img(url):
     return img
 
 
-def get_cmd_str(dx, dy, img):
+def get_cmds(dx, dy, img):
     """
     Compute the command string for the shuffeled image pixels
 
@@ -114,45 +115,87 @@ def get_cmd_str(dx, dy, img):
                 xx=x+dx, yy=y+dy, rgb=rgb).encode())
 
     random.shuffle(cmds)
-    n_px = len(cmds)
-    cmd_str = b''.join(cmds)
     print(' Done.')
 
-    return cmd_str, n_px
+    return cmds
 
 
-def connect_wall(hostname, port):
-    """
-    Connect with maximum number of sockets to the pixel wall
+class Sender():
+    def __init__(self, max_socks=128):
+        self.max_socks = max_socks
+        self.sel = selectors.DefaultSelector()
+        self.buf = {}
+        self.cmds = b''
+        self.px_cnt = 0.0
 
-    :param hostname: hostname of the pixel wall
-    :type hostname: str
+    def get_px_cnt(self):
+        px_cnt = self.px_cnt
+        self.px_cnt = 0.0
+        return int(px_cnt)
 
-    :param port: port of the pixel wall
-    :type port: int
-    """
-    # set maximum number of sockets
-    max_socks = 128
-    if len(sys.argv) > 1:
-        max_socks = int(sys.argv[1])
+    def set_cmd_list(self, cmds):
+        self.cmd_str = b''.join(cmds)
+        self.px_per_str = len(cmds)
 
-    # connect
-    print('Connecting to the Pixel Flut wall at {hn}, {port}'.format(
-        hn=hostname, port=port), end='', flush=True)
-    sockets = []
-    for _ in range(max_socks):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            sock.connect((hostname, port))
-        except ConnectionRefusedError:
-            break
-        sockets.append(sock)
+    def connect(self, hostname, port):
+        """
+        Connect with maximum number of sockets to the pixel wall
 
-    if len(sockets) < 1:
-        raise ConnectionRefusedError('Could not connect with any socket.')
+        :param hostname: hostname of the pixel wall
+        :type hostname: str
 
-    print(' Connected with {} sockets.'.format(len(sockets)))
-    return sockets
+        :param port: port of the pixel wall
+        :type port: int
+        """
+        # connect
+        print('Connecting to the Pixelflut wall at {hn}, {port}'.format(
+            hn=hostname, port=port), end='', flush=True)
+
+        for _ in range(self.max_socks):
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                sock.connect((hostname, port))
+            except ConnectionRefusedError:
+                break
+
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 2**18)
+            self.sel.register(sock, selectors.EVENT_WRITE, self.send)
+            sock.setblocking(0)
+
+        if len(self.sel.get_map()) < 1:
+            raise ConnectionRefusedError('Could not connect with any socket.')
+
+        print(' Connected with {} sockets.'.format(len(self.sel.get_map())))
+
+    def disconnect(self):
+        """
+        Disconnect sockets
+        """
+        for sock in self.sel.get_map().values():
+            self.sel.unregister(sock)
+            sock.close()
+
+    def send(self, sock):
+        """
+        Send data to server
+
+        :param sock: the socket
+        :type sock: socket.socket
+        """
+        data = self.buf.get(sock, b'')
+        sent = sock.send(data)
+        self.buf[sock] = data[sent:]
+        if len(data) == 0:
+            self.buf[sock] = self.cmd_str
+
+        self.px_cnt += float(sent) / len(self.cmd_str) * self.px_per_str
+
+    def send_idle(self):
+        """
+        Fire idle sockets
+        """
+        for k, v in self.sel.select():
+            self.send(k.fileobj)
 
 
 def main():
@@ -165,51 +208,51 @@ def main():
     img = load_img(url)
 
     # connect to wall
-    sockets = connect_wall(hostname, port)
+    max_socks = 128
+    if len(sys.argv) > 1:
+        max_socks = int(sys.argv[1])
+    sender = Sender(max_socks)
+
+    sender.connect(hostname, port)
 
     # precompute wall commands
-    cmd_str, n_px = get_cmd_str(dx, dy, img)
+    sender.set_cmd_list(get_cmds(dx, dy, img))
 
     print('Let\'s Hölli...')
 
     time0 = time.time()
-    i_sock = 0
-    px_cnt = 0
-
     while True:
-        sockets[i_sock].send(cmd_str)
-        px_cnt += n_px
-        i_sock = (i_sock + 1) % len(sockets)
+        sender.send_idle()
 
         if time.time() - time0 > DT:
             # each DT, call API and update stuff, if necessary
-            ndx, ndy, nurl, nhostname, nport, nmode = call_api(px_cnt, ver)
+            ndx, ndy, nurl, nhostname, nport, nmode = call_api(
+                sender.get_px_cnt(), ver)
 
             if nurl != url:
                 url = nurl
                 img = load_img(url)
-                cmd_str, n_px = get_cmd_str(dx, dy, img)
+                sender.set_cmd_list(get_cmds(dx, dy, img))
 
             if ndx != dx or ndy != dy:
                 dx, dy = ndx, ndy
-                cmd_str, n_px = get_cmd_str(dx, dy, img)
+                sender.set_cmd_list(get_cmds(dx, dy, img))
 
             if nhostname != hostname or nport != port:
-                for sock in sockets:
-                    sock.close()
                 hostname, port = nhostname, nport
-                sockets = connect_wall(hostname, port)
+                sender.disconnect()
+                sender.connect(hostname, port)
 
             time0 = time.time()
-            px_cnt = 0
 
 
 if __name__ == '__main__':
     while True:
-        try:
-            main()
-        except Exception as e:
-            # catch all exceptions and restart ;)
-            print('An exception encountered: ',
-                  type(e),  e, ' Restarting...')
-        time.sleep(10.0)
+        main()
+        # try:
+        #    main()
+        # except Exception as e:
+        #    # catch all exceptions and restart ;)
+        #    print('An exception encountered: ',
+        #          type(e),  e, ' Restarting...')
+        # time.sleep(10.0)
