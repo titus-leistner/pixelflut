@@ -152,9 +152,8 @@ class Sender():
             hn=hostname, port=port), end='', flush=True)
 
         for _ in range(self.max_socks):
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
-                sock.connect((hostname, port))
+                sock = socket.create_connection((hostname, port))
             except ConnectionRefusedError:
                 break
 
