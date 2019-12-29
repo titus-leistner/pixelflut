@@ -5,6 +5,7 @@ import sys
 import hashlib
 import selectors
 import time
+import threading
 
 TRANSPARENT = '000000'
 
@@ -197,51 +198,63 @@ class Sender():
             self.send(k.fileobj)
 
 
+class Loops:
+    def __init__(self):
+        # initialize
+        self.ver = version_hash()
+        resp = call_api(0, self.ver)
+        self.dx, self.dy, self.url, self.hostname, self.port, self.mode = resp
+        self.img = load_img(self.url)
+
+        # connect to wall
+        max_socks = 128
+        if len(sys.argv) > 1:
+            max_socks = int(sys.argv[1])
+        self.sender = Sender(max_socks)
+
+        self.sender.connect(self.hostname, self.port)
+
+        # precompute wall commands
+        self.sender.set_cmd_list(get_cmds(self.dx, self.dy, self.img))
+
+    def sending_loop(self):
+        print('Let\'s Hölli...')
+
+        while True:
+            self.sender.send_idle()
+
+    def api_loop(self):
+        while True:
+            # call API and update stuff, if necessary
+            ndx, ndy, nurl, nhostname, nport, nmode = call_api(
+                self.sender.get_px_cnt(), self.ver)
+
+            if nurl != self.url:
+                self.url = nurl
+                self.img = load_img(self.url)
+                self.sender.set_cmd_list(get_cmds(self.dx, self.dy, self.img))
+
+            if ndx != self.dx or ndy != self.dy:
+                self.dx, self.dy = ndx, ndy
+                self.sender.set_cmd_list(get_cmds(self.dx, self.dy, self.img))
+
+            if nhostname != self.hostname or nport != self.port:
+                self.hostname, self.port = nhostname, nport
+                self.sender.disconnect()
+                self.sender.connect(self.hostname, self.port)
+            time.sleep(10.0)
+
+
 def main():
     print('USAGE: python3 hoelli.py [MAX_SOCKETS] [API_URL]')
     ver = version_hash()
     print('VERSION: {ver}'.format(ver=ver))
+    loops = Loops()
 
-    # call API once
-    dx, dy, url, hostname, port, mode = call_api(0, ver)
-    img = load_img(url)
+    api_thread = threading.Thread(target=loops.api_loop)
+    api_thread.start()
 
-    # connect to wall
-    max_socks = 128
-    if len(sys.argv) > 1:
-        max_socks = int(sys.argv[1])
-    sender = Sender(max_socks)
-
-    sender.connect(hostname, port)
-
-    # precompute wall commands
-    sender.set_cmd_list(get_cmds(dx, dy, img))
-
-    print('Let\'s Hölli...')
-
-    i = 0
-    while True:
-        i += 1
-        sender.send_idle()
-
-        if i % 512 == 0:
-            # call API and update stuff, if necessary
-            ndx, ndy, nurl, nhostname, nport, nmode = call_api(
-                sender.get_px_cnt(), ver)
-
-            if nurl != url:
-                url = nurl
-                img = load_img(url)
-                sender.set_cmd_list(get_cmds(dx, dy, img))
-
-            if ndx != dx or ndy != dy:
-                dx, dy = ndx, ndy
-                sender.set_cmd_list(get_cmds(dx, dy, img))
-
-            if nhostname != hostname or nport != port:
-                hostname, port = nhostname, nport
-                sender.disconnect()
-                sender.connect(hostname, port)
+    loops.sending_loop()
 
 
 if __name__ == '__main__':
