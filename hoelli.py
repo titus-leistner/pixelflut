@@ -1,12 +1,11 @@
 import random
 import socket
-import time
 import urllib.request
 import sys
 import hashlib
 import selectors
+import time
 
-DT = 10.0
 TRANSPARENT = '000000'
 
 
@@ -220,12 +219,13 @@ def main():
 
     print('Let\'s Hölli...')
 
-    time0 = time.time()
+    i = 0
     while True:
+        i += 1
         sender.send_idle()
 
-        if time.time() - time0 > DT:
-            # each DT, call API and update stuff, if necessary
+        if i % 512 == 0:
+            # call API and update stuff, if necessary
             ndx, ndy, nurl, nhostname, nport, nmode = call_api(
                 sender.get_px_cnt(), ver)
 
@@ -243,15 +243,13 @@ def main():
                 sender.disconnect()
                 sender.connect(hostname, port)
 
-            time0 = time.time()
-
 
 if __name__ == '__main__':
     while True:
         try:
-           main()
+            main()
         except Exception as e:
-           # catch all exceptions and restart ;)
-           print('An exception encountered: ',
-                 type(e),  e, ' Restarting...')
+            # catch all exceptions and restart ;)
+            print('An exception encountered: ',
+                  type(e),  e, ' Restarting...')
         time.sleep(10.0)
