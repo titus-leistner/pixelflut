@@ -6,7 +6,6 @@ import sys
 import hashlib
 
 DT = 10.0
-MAX_SOCKS = 128
 TRANSPARENT = '000000'
 
 
@@ -133,14 +132,15 @@ def connect_wall(hostname, port):
     :type port: int
     """
     # set maximum number of sockets
+    max_socks = 128
     if len(sys.argv) > 1:
-        MAX_SOCKS = int(sys.argv[1])
+        max_socks = int(sys.argv[1])
 
     # connect
     print('Connecting to the Pixel Flut wall at {hn}, {port}'.format(
         hn=hostname, port=port), end='', flush=True)
     sockets = []
-    for _ in range(MAX_SOCKS):
+    for _ in range(max_socks):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             sock.connect((hostname, port))
