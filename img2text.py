@@ -2,10 +2,10 @@ from skimage.io import imread
 
 
 def main():
-    img = imread('hoelli.png')
+    img = imread('agdsn.png')
     print(img.shape)
 
-    with open('hoelli.csv', 'w') as f:
+    with open('agdsn.csv', 'w') as f:
         for y in range(img.shape[0]):
             line = ''
             for x in range(img.shape[1]):

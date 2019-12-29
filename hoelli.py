@@ -33,8 +33,8 @@ def call_api(px_cnt=0, ver=''):
     """
     # get server api url from command line argument
     api_url = 'http://hoellipixelflut.de/client-api/ipv4/'
-    if len(sys.argv) > 1:
-        api_url = sys.argv[1]
+    if len(sys.argv) > 2:
+        api_url = sys.argv[2]
 
     # request commands and report
     api_url = '{url}?pxc={px_cnt}&ver={ver}'.format(
@@ -132,6 +132,10 @@ def connect_wall(hostname, port):
     :param port: port of the pixel wall
     :type port: int
     """
+    # set maximum number of sockets
+    if len(sys.argv) > 1:
+        MAX_SOCKS = int(sys.argv[1])
+
     # connect
     print('Connecting to the Pixel Flut wall at {hn}, {port}'.format(
         hn=hostname, port=port), end='', flush=True)
@@ -152,7 +156,7 @@ def connect_wall(hostname, port):
 
 
 def main():
-    print('USAGE: python3 hoelli.py [API_URL]')
+    print('USAGE: python3 hoelli.py [MAX_SOCKETS] [API_URL]')
     ver = version_hash()
     print('VERSION: {ver}'.format(ver=ver))
 
@@ -207,5 +211,5 @@ if __name__ == '__main__':
         except Exception as e:
             # catch all exceptions and restart ;)
             print('An exception encountered: ',
-                  type(e),  e, 'Restarting...')
+                  type(e),  e, ' Restarting...')
         time.sleep(10.0)
