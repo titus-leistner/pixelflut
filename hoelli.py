@@ -133,10 +133,12 @@ class Sender():
         return int(px_cnt)
 
     def set_cmd_list(self, cmds):
-        for sock in self.sel.get_map().values():
+        for v in self.sel.get_map().values():
+            sock = v.fileobj
             random.shuffle(cmds)
             self.cmd_str[sock] = b''.join(cmds)
         self.px_per_str = len(cmds)
+        self.chars_per_cmd_str = len(list(self.cmd_str.values())[0])
 
     def connect(self, hostname, port):
         """
@@ -171,7 +173,8 @@ class Sender():
         """
         Disconnect sockets
         """
-        for sock in self.sel.get_map().values():
+        for v in self.sel.get_map().values():
+            sock = v.fileobj
             self.sel.unregister(sock)
             sock.close()
 
@@ -188,7 +191,7 @@ class Sender():
         if len(data) == 0:
             self.buf[sock] = self.cmd_str.get(sock, b'')
 
-        self.px_cnt += float(sent) / len(self.cmd_str) * self.px_per_str
+        self.px_cnt += float(sent) / self.chars_per_cmd_str * self.px_per_str
 
     def send_idle(self):
         """
@@ -258,7 +261,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
     while True:
         try:
             main()
