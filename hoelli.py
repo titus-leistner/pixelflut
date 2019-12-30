@@ -114,19 +114,18 @@ def get_cmds(dx, dy, img):
             cmds.append('PX {xx} {yy} {rgb}\n'.format(
                 xx=x+dx, yy=y+dy, rgb=rgb).encode())
 
-    random.shuffle(cmds)
     print(' Done.')
 
     return cmds
 
 
 class Sender():
-    def __init__(self, max_socks=128):
+    def __init__(self, max_socks=16):
         self.max_socks = max_socks
         self.sel = selectors.DefaultSelector()
         self.buf = {}
-        self.cmds = b''
         self.px_cnt = 0.0
+        self.cmd_str = {}
 
     def get_px_cnt(self):
         px_cnt = self.px_cnt
@@ -134,7 +133,9 @@ class Sender():
         return int(px_cnt)
 
     def set_cmd_list(self, cmds):
-        self.cmd_str = b''.join(cmds)
+        for sock in self.sel.get_map().values():
+            random.shuffle(cmds)
+            self.cmd_str[sock] = b''.join(cmds)
         self.px_per_str = len(cmds)
 
     def connect(self, hostname, port):
@@ -151,7 +152,7 @@ class Sender():
         print('Connecting to the Pixelflut wall at {hn}, {port}'.format(
             hn=hostname, port=port), end='', flush=True)
 
-        for _ in range(self.max_socks):
+        for i in range(self.max_socks):
             try:
                 sock = socket.create_connection((hostname, port))
             except ConnectionRefusedError:
@@ -185,7 +186,7 @@ class Sender():
         sent = sock.send(data)
         self.buf[sock] = data[sent:]
         if len(data) == 0:
-            self.buf[sock] = self.cmd_str
+            self.buf[sock] = self.cmd_str.get(sock, b'')
 
         self.px_cnt += float(sent) / len(self.cmd_str) * self.px_per_str
 
@@ -257,6 +258,7 @@ def main():
 
 
 if __name__ == '__main__':
+    main()
     while True:
         try:
             main()
